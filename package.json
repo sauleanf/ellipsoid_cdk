@@ -2,7 +2,7 @@
   "name": "ellipsoid_cdk",
   "version": "0.1.0",
   "bin": {
-    "ellipsoid_cdk": "bin/ellipsoid_cdk.js"
+    "ellipsoid_cdk": "bin/ellipsoid-cdk.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,13 +14,15 @@
     "@aws-cdk/assert": "1.120.0",
     "@types/jest": "^26.0.10",
     "@types/node": "10.17.27",
+    "aws-cdk": "1.120.0",
     "jest": "^26.4.2",
     "ts-jest": "^26.2.0",
-    "aws-cdk": "1.120.0",
     "ts-node": "^9.0.0",
     "typescript": "~3.9.7"
   },
   "dependencies": {
+    "@aws-cdk/aws-codepipeline-actions": "^1.120.0",
+    "@aws-cdk/aws-ec2": "^1.120.0",
     "@aws-cdk/core": "1.120.0",
     "source-map-support": "^0.5.16"
   }
