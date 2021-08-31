@@ -17,6 +17,7 @@ jobs:
         cache: 'npm'
     - name: Install NPM Depedencies
       run: |
+        npm i -g npm
         npm i -g typescript
         npm i -g aws-cdk
         npm i
