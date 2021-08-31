@@ -7,15 +7,44 @@ import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codedeploy from '@aws-cdk/aws-codedeploy';
 
 export class EllipsoidCdkStack extends cdk.Stack {
-    private vpc: ec2.Vpc;
-    private securityGroup: ec2.SecurityGroup;
+    // name fields
+    private readonly instanceName: string;
+    private readonly instanceRoleName: string;
+
+    // github related fields
+    private readonly owner: string;
+    private readonly repo: string;
+    private readonly branch: string;
+
+    private readonly codeDeployName: string;
+    private readonly codeDeployGroupName: string;
+
+    // AWS resource fields
     private instance: ec2.Instance;
     private instanceRole: iam.Role;
+
+    private vpc: ec2.Vpc;
+    private securityGroup: ec2.SecurityGroup;
+
+    private readonly pipelineName: string;
+    private pipeline: codepipeline.Pipeline;
 
     constructor(scope: Construct,
                 id: string,
                 props?: cdk.StackProps) {
         super(scope, id, props);
+
+        this.instanceName = 'EllipsoidInstance';
+        this.instanceRoleName = 'ellipsoid-webserver-role';
+
+        this.pipelineName = 'EllipsoidPipeline';
+
+        this.owner = 'sauleanf';
+        this.repo = 'ellipsoid_appserver';
+        this.branch = 'deploy';
+
+        this.codeDeployName = 'EllipsoidCodeDeploy';
+        this.codeDeployGroupName = 'DeployEllipsoidAppserverGroup';
 
         this.createVPC();
         this.createInstance();
@@ -23,7 +52,7 @@ export class EllipsoidCdkStack extends cdk.Stack {
     }
 
     createRoles() {
-        this.instanceRole = new iam.Role(this, 'webserver-role', {
+        this.instanceRole = new iam.Role(this, this.instanceRoleName, {
             assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
             managedPolicies: [
                 iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3ReadOnlyAccess'),
@@ -55,7 +84,7 @@ export class EllipsoidCdkStack extends cdk.Stack {
     }
 
     createInstance() {
-        this.instance = new ec2.Instance(this, 'EllipsoidInstance', {
+        this.instance = new ec2.Instance(this, this.instanceName, {
             instanceType: ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
                 ec2.InstanceSize.MICRO,
@@ -64,46 +93,43 @@ export class EllipsoidCdkStack extends cdk.Stack {
                 generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
             }),
             vpc: this.vpc,
-            instanceName: 'EllipsoidInstance',
+            instanceName: this.instanceName,
             role: this.instanceRole,
         });
     }
 
     createPipeline() {
-        const pipeline = new codepipeline.Pipeline(this, 'EllipsoidPipeline', {
-            pipelineName: 'EllipsoidPipeline',
+        this.pipeline = new codepipeline.Pipeline(this, this.pipelineName, {
+            pipelineName: this.pipelineName,
         });
 
+        // adds github repo source stage
         const sourceOutput = new codepipeline.Artifact();
-
         const gitHubOAuthToken = cdk.SecretValue.secretsManager('ellipsoid/github/token');
-
         const githubSourceAction = new actions.GitHubSourceAction({
             output: sourceOutput,
-            actionName: "fetchEllipsoidFromGithub",
+            actionName: 'fetchEllipsoidFromGithub',
             oauthToken: gitHubOAuthToken,
-            owner: "sauleanf",
-            repo: "ellipsoid_appserver",
-            branch: 'deploy',
+            owner: this.owner,
+            repo: this.repo,
+            branch: this.branch,
         });
-        pipeline.addStage({
+        this.pipeline.addStage({
             stageName: 'SourceStage',
-            actions: [
-                githubSourceAction
-            ],
+            actions: [githubSourceAction],
         });
 
-        const application = new codedeploy.ServerApplication(this, 'EllipsoidCodeDeploy', {
-            applicationName: 'EllipsoidCodeDeploy',
+        // adds code deploy stage
+        const application = new codedeploy.ServerApplication(this, this.codeDeployName, {
+            applicationName: this.codeDeployName,
         });
-
-        const deploymentGroup = new codedeploy.ServerDeploymentGroup(this, 'CodeDeployDeploymentGroup', {
+        const deploymentGroup = new codedeploy.ServerDeploymentGroup(this, this.codeDeployGroupName, {
             application,
-            deploymentGroupName: 'MyDeploymentGroup',
+            deploymentGroupName: this.codeDeployGroupName,
             installAgent: true,
             ec2InstanceTags: new codedeploy.InstanceTagSet(
                 {
-                    'owner': ['sauleanf@umich.edu'],
+                    Name: [this.instanceName],
                 },
             ),
             ignorePollAlarmsFailure: false,
@@ -112,14 +138,12 @@ export class EllipsoidCdkStack extends cdk.Stack {
                 stoppedDeployment: true,
             },
         });
-
         const deployAction = new actions.CodeDeployServerDeployAction({
             actionName: 'CodeDeploy',
             input: sourceOutput,
             deploymentGroup,
         });
-
-        pipeline.addStage({
+        this.pipeline.addStage({
             stageName: 'Deploy',
             actions: [deployAction],
         });
