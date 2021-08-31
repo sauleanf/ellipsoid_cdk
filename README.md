@@ -1,6 +1,6 @@
-# Welcome to your CDK TypeScript project!
+# Ellipsoid CDK
 
-This is a blank project for TypeScript development with CDK.
+This is the TypeScript AWS CDK for the Ellipsoid Application.
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
