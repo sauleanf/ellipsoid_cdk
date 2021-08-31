@@ -16,6 +16,8 @@ jobs:
         node-version: '14'
         cache: 'npm'
     - name: Install NPM Depedencies
-      run: npm install
+      run: |
+        npm i
+        npm i -g aws-cdk
     - name: Attempt to build into JavaScript
       run: npm run build
