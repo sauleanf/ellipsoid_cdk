@@ -1,9 +1,10 @@
 import * as cdk from '@aws-cdk/core';
-import {Construct} from '@aws-cdk/core';
+import {Construct, Duration} from '@aws-cdk/core';
 import * as ec2 from '@aws-cdk/aws-ec2';
 import * as iam from '@aws-cdk/aws-iam';
 import * as actions from '@aws-cdk/aws-codepipeline-actions'
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
 import * as codedeploy from '@aws-cdk/aws-codedeploy';
 
 export class EllipsoidCdkStack extends cdk.Stack {
@@ -11,13 +12,15 @@ export class EllipsoidCdkStack extends cdk.Stack {
     private readonly instanceName: string;
     private readonly instanceRoleName: string;
 
-    // github related fields
+    // pipeline related fields
+    private readonly pipelineName: string;
     private readonly owner: string;
     private readonly repo: string;
     private readonly branch: string;
-
     private readonly codeDeployName: string;
     private readonly codeDeployGroupName: string;
+
+    private readonly alarmName: string;
 
     // AWS resource fields
     private instance: ec2.Instance;
@@ -26,8 +29,8 @@ export class EllipsoidCdkStack extends cdk.Stack {
     private vpc: ec2.Vpc;
     private securityGroup: ec2.SecurityGroup;
 
-    private readonly pipelineName: string;
     private pipeline: codepipeline.Pipeline;
+    private metric: cloudwatch.Metric;
 
     constructor(scope: Construct,
                 id: string,
@@ -38,20 +41,21 @@ export class EllipsoidCdkStack extends cdk.Stack {
         this.instanceRoleName = 'ellipsoid-webserver-role';
 
         this.pipelineName = 'EllipsoidPipeline';
-
         this.owner = 'sauleanf';
         this.repo = 'ellipsoid_appserver';
         this.branch = 'deploy';
-
         this.codeDeployName = 'EllipsoidCodeDeploy';
         this.codeDeployGroupName = 'DeployEllipsoidAppserverGroup';
+
+        this.alarmName = 'EllipsoidCeleryAlarm';
 
         this.createVPC();
         this.createInstance();
         this.createPipeline();
+        this.createAlarms();
     }
 
-    createRoles() {
+    createRoles(): void {
         this.instanceRole = new iam.Role(this, this.instanceRoleName, {
             assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
             managedPolicies: [
@@ -60,7 +64,7 @@ export class EllipsoidCdkStack extends cdk.Stack {
         });
     }
 
-    createVPC() {
+    createVPC(): void {
         this.vpc = new ec2.Vpc(this, 'EllipsoidVPC', {
             subnetConfiguration: [
                 {
@@ -83,7 +87,28 @@ export class EllipsoidCdkStack extends cdk.Stack {
         );
     }
 
-    createInstance() {
+    createAlarms(): void {
+        this.metric = new cloudwatch.Metric({
+            namespace: 'CeleryHealth',
+            metricName: 'WorkHealthStatus',
+            dimensions: {
+                APP_SERVICE: 'EllipsoidApplication'
+            }
+        });
+
+        this.metric.with({
+            period: Duration.seconds(30),
+        });
+
+        this.metric.createAlarm(this, this.alarmName, {
+            alarmName: this.alarmName,
+            treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+            evaluationPeriods: 1,
+            threshold: 0
+        });
+    }
+
+    createInstance(): void {
         this.instance = new ec2.Instance(this, this.instanceName, {
             instanceType: ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
@@ -98,7 +123,7 @@ export class EllipsoidCdkStack extends cdk.Stack {
         });
     }
 
-    createPipeline() {
+    createPipeline(): void {
         this.pipeline = new codepipeline.Pipeline(this, this.pipelineName, {
             pipelineName: this.pipelineName,
         });

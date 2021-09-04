@@ -1,0 +1,25 @@
+name: Eslint
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+        cache: 'npm'
+    - name: Install NPM Depedencies
+      run: |
+        npm i -g npm
+        npm i -g typescript
+        npm i -g aws-cdk
+        npm i
+    - name: Run eslint
+      run: npm run lint
